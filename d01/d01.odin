@@ -51,6 +51,8 @@ part_2 :: proc(left, right: [dynamic] int) -> int {
 main :: proc() {
     input := util.read_input_file("d01/d01.txt") 
     left, right := parse_id_lists(&input)
+    defer delete(right)
+    defer delete(left)
     fmt.println("Part 1:", part_1(left, right))
     fmt.println("Part 2:", part_2(left, right))
 }
