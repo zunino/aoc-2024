@@ -64,12 +64,12 @@ grid_del :: proc(grid: ^Grid) {
 }
 
 grid_print :: proc(grid: Grid) {
-    for i in 0..<grid.rows {
-        for j in 0..<grid.cols {
-            fmt.printf("%c ", grid.cells[i][j])
-        }
-        fmt.println()
-    }
+	for i in 0 ..< grid.rows {
+		for j in 0 ..< grid.cols {
+			fmt.printf("%c ", grid.cells[i][j])
+		}
+		fmt.println()
+	}
 }
 
 @(private)
@@ -134,6 +134,10 @@ make_grid_from_input :: proc(input: string) -> Grid {
 
 @(private)
 part_1 :: proc(input: string) -> int {
+	remaining_chars := map[u8]string {
+		'X' = "MAS",
+		'S' = "AMX",
+	}
 	grid := make_grid_from_input(input)
 	defer grid_del(&grid)
 	outer_chars, _ := strings.ascii_set_make("XS")
@@ -142,12 +146,7 @@ part_1 :: proc(input: string) -> int {
 		for j in 0 ..< grid.cols {
 			cell := grid.cells[i][j]
 			if strings.ascii_set_contains(outer_chars, cell) {
-				xmas_sequences_found += look_around(
-					&grid,
-					row = i,
-					col = j,
-					outer_char = cell,
-				)
+				xmas_sequences_found += look_around(&grid, row = i, col = j, outer_char = cell)
 			}
 		}
 	}
@@ -155,16 +154,60 @@ part_1 :: proc(input: string) -> int {
 }
 
 @(private)
+@(link_name = "find_x")look_for_x_formation :: proc(
+	grid: ^Grid,
+	row: int,
+	col: int,
+	top_left_char: u8,
+) -> (
+	x_found: int,
+) {
+	end_chars := map[u8]u8 {
+		'M' = 'S',
+		'S' = 'M',
+	}
+	x_found = 0
+	if row + 2 >= grid.rows || col + 2 >= grid.cols do return
+	if grid.cells[row + 1][col + 1] != 'A' do return
+	top_right_char := grid.cells[row][col + 2]
+	if !(top_right_char in end_chars) do return
+	end_char_1 := end_chars[top_left_char]
+	end_char_2 := end_chars[top_right_char]
+	if grid.cells[row + 2][col + 2] != end_char_1 do return
+	if grid.cells[row + 2][col] != end_char_2 do return
+	x_found = 1
+	return
+}
+
+@(private)
 part_2 :: proc(input: string) -> int {
-	return 0
+	grid := make_grid_from_input(input)
+	defer grid_del(&grid)
+	outer_chars, _ := strings.ascii_set_make("MS")
+	x_formations_found := 0
+	for i in 0 ..< grid.rows {
+		for j in 0 ..< grid.cols {
+			cell := grid.cells[i][j]
+			if strings.ascii_set_contains(outer_chars, cell) {
+				x_formations_found += look_for_x_formation(
+					&grid,
+					row = i,
+					col = j,
+					top_left_char = cell,
+				)
+			}
+		}
+	}
+	return x_formations_found
 }
 
 main :: proc() {
 	input := util.read_input_file("d04/d04.txt")
-    defer delete(input)
 	// input := util.read_input_file("d04/sample-input.txt")
 	xmas_occurrences := part_1(input)
 	fmt.println("Part 1:", xmas_occurrences)
+	x_formations := part_2(input)
+	fmt.println("Part 2:", x_formations)
 }
 
 @(test)
