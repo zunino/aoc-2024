@@ -107,19 +107,42 @@ part_1 :: proc(successors: Successors, predecessors: Predecessors, updates: []Pa
 	return middle_page_numbers_sum
 }
 
+fix_page_ordering :: proc(successors: Successors, predecessors: Predecessors, pages: ^Pages) {
+	for {
+		swaps := false
+		for i in 0 ..< len(pages) - 1 {
+			curr_page := pages[i]
+			next_page := pages[i + 1]
+			page_successors := successors[curr_page][:]
+			if slice.contains(page_successors, next_page) do continue
+			slice.swap(pages[:], i, i + 1)
+			swaps = true
+		}
+		if !swaps do break
+	}
+}
+
 @(private)
-part_2 :: proc(input: string) -> int {
-	return 0
+part_2 :: proc(successors: Successors, predecessors: Predecessors, updates: []Pages) -> int {
+	middle_page_numbers_sum := 0
+	for &pages in updates {
+		if check_page_order(successors, predecessors, pages) do continue
+		fix_page_ordering(successors, predecessors, &pages)
+		middle_page_numbers_sum += pages[len(pages) / 2]
+	}
+	return middle_page_numbers_sum
 }
 
 main :: proc() {
 	predecessors, successors, list_of_updates := parse_input_file("d05/d05.txt")
-	// predecessors, successors, updates := parse_input_file("d05/sample-input.txt")
+	// predecessors, successors, list_of_updates := parse_input_file("d05/sample-input.txt")
 	defer delete_dynarr_of_dynarr(list_of_updates)
 	defer delete_map(successors)
 	defer delete_map(predecessors)
-	middle_page_numbers_sum := part_1(successors, predecessors, list_of_updates[:])
-	fmt.println("Part 1:", middle_page_numbers_sum)
+	middle_page_sum_correct_updates := part_1(successors, predecessors, list_of_updates[:])
+	fmt.println("Part 1:", middle_page_sum_correct_updates)
+	middle_page_sum_incorrect_updates := part_2(successors, predecessors, list_of_updates[:])
+	fmt.println("Part 2:", middle_page_sum_incorrect_updates)
 }
 
 @(test)
@@ -147,3 +170,28 @@ test_check_page_order :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, slice.equal(results[:], []bool{false, true, true, false}), true)
 }
+
+@(test)
+test_fix_page_ordering :: proc(t: ^testing.T) {
+	successors := Successors {
+		10 = [dynamic]int{20, 30, 70},
+		20 = [dynamic]int{30, 70},
+		30 = [dynamic]int{70},
+		70 = [dynamic]int{},
+	}
+	defer delete_map(successors)
+	predecessors := Predecessors {
+		10 = [dynamic]int{},
+		20 = [dynamic]int{10},
+		30 = [dynamic]int{10, 20},
+		70 = [dynamic]int{10, 20, 30},
+	}
+	defer delete_map(predecessors)
+	pages := Pages{30, 70, 10, 20}
+	defer delete(pages)
+	fixed_pages := Pages{10, 20, 30, 70}
+	defer delete(fixed_pages)
+	fix_page_ordering(successors, predecessors, &pages)
+	testing.expect_value(t, slice.equal(pages[:], fixed_pages[:]), true)
+}
+
