@@ -21,6 +21,7 @@ Node :: struct {
 	total:      int,
 	plus_child: ^Node,
 	mult_child: ^Node,
+	conc_child: ^Node,
 }
 
 @(private)
@@ -64,7 +65,15 @@ free_equations :: proc(equations: [dynamic]Equation) {
 free_tree :: proc(node: ^Node) {
 	if node.plus_child != nil do free_tree(node.plus_child)
 	if node.mult_child != nil do free_tree(node.mult_child)
+	if node.conc_child != nil do free_tree(node.conc_child)
 	free(node)
+}
+
+@(private)
+join_ints :: proc(v1, v2: int) -> int {
+	joined_str := fmt.tprintf("%d%d", v1, v2)
+	joined_int, _ := strconv.parse_int(joined_str)
+	return joined_int
 }
 
 @(private)
@@ -77,27 +86,40 @@ build_tree :: proc(parent: ^Node, operands: []int) {
 	mult_child := new(Node)
 	mult_child.value = operand
 	mult_child.total = parent.total * operand
+	conc_child := new(Node)
+	conc_child.value = operand
+	conc_child.total = join_ints(parent.total, operand)
 	parent.plus_child = plus_child
 	parent.mult_child = mult_child
+	parent.conc_child = conc_child
 	build_tree(plus_child, operands[1:])
 	build_tree(mult_child, operands[1:])
+	build_tree(conc_child, operands[1:])
 }
 
 @(private)
-dfs_check_result :: proc(node: ^Node, target: int) -> bool {
-	if node.total == target do return true
-	if node.plus_child == nil do return false
-	return dfs_check_result(node.plus_child, target) || dfs_check_result(node.mult_child, target)
+dfs_check_result :: proc(node: ^Node, target: int, include_conc_op: bool = false) -> bool {
+	if node.total > target do return false
+	if node.plus_child == nil { // leaf reached / tree branch fully explored
+		return node.total == target
+	}
+	result :=
+		dfs_check_result(node.plus_child, target, include_conc_op) ||
+		dfs_check_result(node.mult_child, target, include_conc_op)
+	if !result && include_conc_op {
+		result = dfs_check_result(node.conc_child, target, include_conc_op)
+	}
+	return result
 }
 
 @(private)
-check_equation :: proc(equation: Equation) -> bool {
+check_equation :: proc(equation: Equation, include_conc_op: bool = false) -> bool {
 	tree := new(Node)
 	defer free_tree(tree)
 	tree.value = equation.operands[0]
 	tree.total = tree.value
 	build_tree(tree, equation.operands[1:])
-	return dfs_check_result(tree, equation.result)
+	return dfs_check_result(tree, equation.result, include_conc_op)
 }
 
 @(private)
@@ -112,8 +134,14 @@ part_1 :: proc(equations: [dynamic]Equation) -> int {
 }
 
 @(private)
-part_2 :: proc() -> int {
-	return 0
+part_2 :: proc(equations: [dynamic]Equation) -> int {
+	total_calibration_result := 0
+	for equation in equations {
+		if check_equation(equation, include_conc_op = true) {
+			total_calibration_result += equation.result
+		}
+	}
+	return total_calibration_result
 }
 
 main :: proc() {
@@ -127,6 +155,9 @@ main :: proc() {
 
 	total_calibration_result := part_1(equations)
 	fmt.println("Part 1:", total_calibration_result)
+
+	new_total_calibration_result := part_2(equations)
+	fmt.println("Part 2:", new_total_calibration_result)
 }
 
 @(test)
@@ -156,4 +187,10 @@ test_build_tree :: proc(t: ^testing.T) {
 	testing.expect_value(t, tree.plus_child.total, 30)
 	testing.expect_value(t, tree.mult_child.value, 20)
 	testing.expect_value(t, tree.mult_child.total, 200)
+}
+
+@(test)
+test_join_ints :: proc(t: ^testing.T) {
+	res := join_ints(115, 48)
+	testing.expect_value(t, res, 11548)
 }
